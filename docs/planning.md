@@ -10,8 +10,8 @@ Requirements come first, then one complete vertical slice at a time: backend, te
 | --- | --- | --- | --- |
 | 1 | Requirements and planning | `requirements.md`, `architecture.md`, this plan, Git repo | Done |
 | 2 | Application setup | Rails API and React app scaffolded, CI (lint, type check, security scans), both run locally | Mostly done (needs a CI run on GitHub and the local DB checked) |
-| 3a | Employee and salary data model | `Employee` and `EmployeeSalary` models, two-table schema, `Country` list, deterministic seed script with one starting salary period per employee, model specs | Not started |
-| 3b | Salary history | Add salary periods for later changes, current-effective-salary lookup, effective-date handling, and model specs | Not started |
+| 3a | Employee and salary data model | `Employee` and `EmployeeSalary` models, two-table schema, `Country` list, deterministic seed script with one starting salary period per employee, model specs | Draft for review |
+| 3b | Salary history | Add salary periods for later changes, current-effective-salary lookup, effective-date handling, and model specs | Draft for review |
 | 3c | Employee API | CRUD and salary-history endpoints, transactional employee/initial-salary creation and country changes, request specs, API section in `architecture.md` | Not started |
 | 4 | Frontend core workflows | Employee directory (search, filters, pagination), create/edit/delete, loading, empty, and error states | Not started |
 | 5 | Salary insights | Insights endpoints (query objects), Insights page, figures checked against the data | Not started |

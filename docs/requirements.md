@@ -14,7 +14,7 @@ Replace the spreadsheets that ACME's HR team uses today with a web app. In the a
 
 1. **Employee directory.** A paginated, server-side list of all employees with search by name or email and filters for country, department, and job title. It stays fast at 10,000 rows or more.
 2. **Manage employees and salaries.** Create, view, edit, and delete employee details, and record salary periods. Employee details include name, email, job title, department, country, employment type, and hire date. Each salary period has an annual salary, currency, and effective date. Validate required fields, unique email, a positive salary, and currency consistency with the employee's country when the period is created. Hire dates cannot be in the future.
-3. **Salary history.** Store the initial salary and each later salary change as a separate row, and let HR review the history. A salary change adds a new period; it does not overwrite an earlier period. Current salary is the latest period effective today.
+3. **Salary history.** Store the initial salary and each later salary change as a separate row, and let HR review the history. A salary change adds a new period; it does not overwrite an earlier period. Salary increases and decreases are both allowed. Effective dates may be in the past or future; current salary is the latest period effective today.
 4. **Salary insights.** These answer "how do we pay people":
    - Per country: headcount, total payroll, and minimum, median, average, and maximum salary.
    - Per job title within a country: the same statistics, so like-for-like roles can be compared.

@@ -1,6 +1,6 @@
 # Architecture
 
-This document records the planned design and the reasons behind its decisions. It will be updated as implementation details are settled.
+This document describes the current design. Each section records its decisions and their trade-offs next to the design they apply to, and is kept in step with the code.
 
 ## Overview
 
@@ -89,7 +89,7 @@ Salary periods are stored in `employee_salaries`, one row per change. A period a
 | `effective_on` | date | `NOT NULL` | required; may be past, current, or future |
 | `created_at`, `updated_at` | timestamp | `NOT NULL` | set by Rails |
 
-The seed will create the first salary period with each employee. Each salary change adds another row; existing periods are not overwritten. Historical rows retain their currency if the employee later moves to a different country. The employee association will delete salary periods when an employee is destroyed. The API should create the initial salary period with an employee and create a matching salary period when the employee's country changes, in the same transaction.
+The seed creates the first salary period with each employee. Each salary change adds another row; existing periods are not overwritten. Historical rows retain their currency if the employee later moves to a different country. The Rails association deletes salary periods when an employee is destroyed. The API should create the initial salary period with an employee and create a matching salary period when the employee's country changes, in the same transaction.
 
 ### Supported countries and currencies
 
@@ -171,7 +171,7 @@ Because every group is scoped to a single country, and each country has exactly 
 
 ### Seed data
 
-`db/seeds.rb` will call `EmployeeSeed` (`lib/employee_seed.rb`) to create 10,000 synthetic employees and one initial salary period per employee.
+`db/seeds.rb` calls `EmployeeSeed` (`lib/employee_seed.rb`) to create 10,000 synthetic employees and one initial salary period per employee.
 
 - **Deterministic.** Headcount per country (US 3000, IN 2000, GB 1200, DE 1000, FR 800, JP 700, SG 700, NL 600) and per job title within each country is allocated from fixed weights. Every country therefore has all 8 departments and all 18 job titles, with at least 10 employees per country–job-title group and at least 30 per country–department group. Names, salary variation, employment type and hire date come from a fixed random seed, so every run produces identical data.
 - **Exact salaries.** Generated from a per-title base, a country pay factor, ±20% variation and a part-time reduction, using Integer and Rational arithmetic only. Rounded to whole units (nearest 100, or 1,000 for INR and JPY).
