@@ -22,6 +22,7 @@ import { ApiError } from '../../api/client'
 import { useCreateEmployee, useMeta, useUpdateEmployee } from '../../api/queries'
 import type { Employee, EmploymentType, Meta } from '../../api/types'
 import { DateField } from '../../components/DateField'
+import { amountInWords } from '../../lib/amountInWords'
 import { EMPLOYMENT_TYPE_LABELS, formatDate, fullName } from '../../lib/format'
 import { applyServerErrors } from '../../lib/formErrors'
 
@@ -172,6 +173,7 @@ function EmployeeForm({ meta, employee, onCancel, onSaved, isDirtyRef }: Employe
       currency: (value) => (editing || value ? null : 'Choose a currency'),
     },
   })
+  const salaryWords = amountInWords(form.values.salary, form.values.currency)
 
   useEffect(() => {
     isDirtyRef.current = () => form.isDirty()
@@ -337,24 +339,26 @@ function EmployeeForm({ meta, employee, onCancel, onSaved, isDirtyRef }: Employe
                   form.setFieldValue('currency', currency)
                 }}
               />
-              <NumberInput
-                style={{ gridColumn: 'span 2' }}
-                label="Annual base salary"
-                required
-                min={0}
-                allowNegative={false}
-                decimalScale={zeroDecimal(form.values.currency) ? 0 : 2}
-                thousandSeparator=","
-                hideControls
-                leftSection={<Text size="xs" fw={600} c="dimmed">{form.values.currency}</Text>}
-                leftSectionWidth={48}
-                description={
-                  form.values.hire_date
-                    ? `Effective from ${formatDate(form.values.hire_date)}, the joining date.`
-                    : 'Effective from the joining date.'
-                }
-                {...form.getInputProps('salary')}
-              />
+              <Stack gap={4} style={{ gridColumn: 'span 2' }}>
+                <NumberInput
+                  label="Annual base salary"
+                  required
+                  min={0}
+                  allowNegative={false}
+                  decimalScale={zeroDecimal(form.values.currency) ? 0 : 2}
+                  thousandSeparator=","
+                  hideControls
+                  leftSection={<Text size="xs" fw={600} c="dimmed">{form.values.currency}</Text>}
+                  leftSectionWidth={48}
+                  description={
+                    form.values.hire_date
+                      ? `Effective from ${formatDate(form.values.hire_date)}, the joining date.`
+                      : 'Effective from the joining date.'
+                  }
+                  {...form.getInputProps('salary')}
+                />
+                {salaryWords && <Text size="xs" c="dimmed" aria-live="polite">{salaryWords}</Text>}
+              </Stack>
             </SimpleGrid>
           </>
         )}

@@ -15,6 +15,7 @@ import { ApiError } from '../../api/client'
 import { useSaveSalaryRecord } from '../../api/queries'
 import type { Employee, Meta, SalaryRecord } from '../../api/types'
 import { DateField } from '../../components/DateField'
+import { amountInWords } from '../../lib/amountInWords'
 import { formatDate, formatMoney, formatPercent } from '../../lib/format'
 import { applyServerErrors } from '../../lib/formErrors'
 import { describeTiming, otherPendingRecord, type Timing } from './salaryTiming'
@@ -96,6 +97,7 @@ function SalaryForm({ onClose, employee, history, meta, record, onEditRecord }: 
   })
 
   const { effective_on: effectiveOn, currency, salary } = form.values
+  const salaryWords = amountInWords(salary, currency)
   const timing = effectiveOn ? describeTiming(effectiveOn, meta.today, others) : null
   const compareTo = current && current.id !== record?.id ? current : null
   const amount = Number(salary)
@@ -179,26 +181,28 @@ function SalaryForm({ onClose, employee, history, meta, record, onEditRecord }: 
             description={`Usually ${countryCurrency} for ${employee.country_name}.`}
             {...form.getInputProps('currency')}
           />
-          <NumberInput
-            style={{ gridColumn: 'span 2' }}
-            label="Annual base salary"
-            required
-            min={0}
-            allowNegative={false}
-            decimalScale={zeroDecimal(currency) ? 0 : 2}
-            thousandSeparator=","
-            hideControls
-            leftSection={<Text size="xs" fw={600} c="dimmed">{currency}</Text>}
-            leftSectionWidth={48}
-            description={
-              compareTo && amount > 0 && currency === compareTo.currency
-                ? `${formatPercent(((amount - Number(compareTo.salary)) / Number(compareTo.salary)) * 100)} compared with the current ${formatMoney(compareTo.salary, compareTo.currency)}`
-                : compareTo && currency !== compareTo.currency
-                  ? `The current salary is in ${compareTo.currency}, so no change % is shown.`
-                  : 'Increases and decreases are both allowed.'
-            }
-            {...form.getInputProps('salary')}
-          />
+          <Stack gap={4} style={{ gridColumn: 'span 2' }}>
+            <NumberInput
+              label="Annual base salary"
+              required
+              min={0}
+              allowNegative={false}
+              decimalScale={zeroDecimal(currency) ? 0 : 2}
+              thousandSeparator=","
+              hideControls
+              leftSection={<Text size="xs" fw={600} c="dimmed">{currency}</Text>}
+              leftSectionWidth={48}
+              description={
+                compareTo && amount > 0 && currency === compareTo.currency
+                  ? `${formatPercent(((amount - Number(compareTo.salary)) / Number(compareTo.salary)) * 100)} compared with the current ${formatMoney(compareTo.salary, compareTo.currency)}`
+                  : compareTo && currency !== compareTo.currency
+                    ? `The current salary is in ${compareTo.currency}, so no change % is shown.`
+                    : 'Increases and decreases are both allowed.'
+              }
+              {...form.getInputProps('salary')}
+            />
+            {salaryWords && <Text size="xs" c="dimmed" aria-live="polite">{salaryWords}</Text>}
+          </Stack>
         </SimpleGrid>
 
         {timing && (
