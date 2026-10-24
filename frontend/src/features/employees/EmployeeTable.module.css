@@ -1,0 +1,24 @@
+.table {
+  --table-highlight-on-hover-color: var(--mantine-color-brand-0);
+}
+
+.row {
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  font-weight: 600;
+  font-size: inherit;
+  color: inherit;
+  border-radius: var(--mantine-radius-sm);
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-color-brand-6);
+    outline-offset: 2px;
+  }
+}

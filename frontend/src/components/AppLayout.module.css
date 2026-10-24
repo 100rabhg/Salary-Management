@@ -1,0 +1,78 @@
+.header {
+  height: 60px;
+  background: var(--app-header-bg);
+  border-bottom: 3px solid var(--mantine-color-brand-5);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--mantine-color-brand-7);
+  color: white;
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--mantine-radius-md);
+  color: var(--mantine-color-navy-2);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+
+  &:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &:global(.active) {
+    color: white;
+    background: rgba(45, 212, 191, 0.16);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-color-brand-4);
+    outline-offset: 2px;
+  }
+}
+
+.profile {
+  padding: 4px 8px;
+  min-height: 44px;
+  border-radius: var(--mantine-radius-md);
+  transition: background-color 150ms ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mantine-color-brand-4);
+    outline-offset: 2px;
+  }
+}
+
+.skipLink {
+  position: absolute;
+  left: 16px;
+  top: -48px;
+  z-index: 200;
+  padding: 8px 12px;
+  background: white;
+  color: var(--mantine-color-navy-9);
+  border-radius: var(--mantine-radius-md);
+
+  &:focus {
+    top: 8px;
+  }
+}
