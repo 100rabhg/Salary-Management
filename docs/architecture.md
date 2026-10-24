@@ -261,7 +261,7 @@ All endpoints are under `/api/v1` and speak JSON. Amounts are decimal **strings*
 | Method and path | Purpose | Notes |
 | --- | --- | --- |
 | `GET /meta` | Reference data | `today`, `time_zone`, `default_currency`, `countries` (`code`, `name`, `currency`), `currencies` (`code`, `zero_decimal`), `employment_types`, and the distinct `departments` and `job_titles` |
-| `GET /employees` | Directory | Query: `page` (default 1), `per_page` (default 25, max 100), `q`, `country_code`, `department`, `job_title`, `employment_type`, `sort` (`name`, `hire_date`, `created_at`; unknown values fall back to `name`), `direction` (`asc`, `desc`). Returns `{ data, meta: { page, per_page, total, total_pages } }`. A page past the end returns an empty `data` |
+| `GET /employees` | Directory | Query: `page` (default 1), `per_page` (default 25, max 100), `q`, `country_code`, `department`, `job_title`, `employment_type`, `sort` (`name`, `job_title`, `country` by country name, `hire_date`, `salary`, `created_at`; unknown values fall back to `name`). `salary` sorts by the current salary's currency and then the amount, because amounts in different currencies can't be compared; employees with no current salary come last, `direction` (`asc`, `desc`). Returns `{ data, meta: { page, per_page, total, total_pages } }`. A page past the end returns an empty `data` |
 | `POST /employees` | Create | `{ employee: { …details, first_salary: { salary, currency? } } }`. Creates the first salary period effective on `hire_date`. Errors for the salary are keyed `first_salary.salary` and `first_salary.currency` |
 | `GET /employees/:id` | Profile | Employee details |
 | `PATCH /employees/:id` | Update | `{ employee: { …details, lock_version } }`. Country changes leave salary periods untouched |
@@ -298,6 +298,8 @@ src/
 
 - **Data fetching:** TanStack Query. Every write invalidates the employee queries and `meta`, so the directory, profile, history and filter options stay in step. The directory keeps the previous page on screen while the next one loads.
 - **Components:** Mantine 9 (tables, forms, selects, date inputs, modals, notifications) with Tabler icons.
+- **Directory table:** every column sorts on the server. The salary column shows the current salary, with a scheduled change as a second line only when there is one.
+- **Profile:** one salary card shows the current salary and its change from the previous one (or "Starting salary"). The scheduled change appears as a highlighted panel in that card only when it exists, so nothing renders as an empty slot.
 - **Routing:** React Router. The directory's search, filters, sort and page live in the URL, so views can be bookmarked and the Back button restores them; the profile's breadcrumb returns to the same list view.
 - **Forms:** Mantine form with validation on blur and on submit. Server validation errors are shown under the matching field. A `409 stale_record` keeps the modal open and offers to load the latest values. The form sends the `lock_version` it was opened with, so a save can't overwrite someone else's edit.
 

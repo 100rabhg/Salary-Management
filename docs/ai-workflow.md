@@ -118,3 +118,7 @@ How AI tools are used on this project, and how their output is checked. This is 
 - Chose Asia/Kolkata as the business date, and kept deleting employees.
 - Decided that the joining date is the first salary's effective date, and that every salary period stays editable for corrections, at the cost of having no audit trail yet (recorded as out of scope).
 - Separated salary currency from country, which means future insights must group by currency as well as country.
+
+**Review round on the UI**
+- After using the app, I asked for the directory's current-salary and scheduled-change columns to be merged into one salary column, for sorting on every column, for the profile's scheduled-change and last-change cards to stop looking empty when there's no data, and for more left padding in both tables. I had also removed the country hint from the edit-employee form.
+- The AI added server-side sorts for role, country (by name, not code) and salary. Salary sorts by currency and then amount, so different currencies are never ranked against each other. It merged the profile's three cards into one salary card in which the scheduled change appears only when there is one, and widened the table padding. It checked the result in screenshots with and without a scheduled change, at desktop and phone widths, and timed the new sorts on 10,000 rows (under 70 ms).

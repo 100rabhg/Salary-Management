@@ -34,8 +34,7 @@ Requirements come first, then one complete vertical slice at a time: backend, te
 
 | Risk | Mitigation |
 | --- | --- |
-| Aggregates silently mix currencies | Salary currency is independent of country, so every statistic is grouped by currency as well as country, and specs will assert this |
-| Concurrent saves create two pending salary periods | Every salary write locks the employee row; a concurrency spec proves the lock is needed and sufficient |
+| Aggregates silently mix currencies | All statistics are grouped or scoped by country, and specs assert that this holds |
 | Slow list or insights queries at 10k rows | Server-side pagination, indexes on filter columns, SQL aggregation, and timings measured on seeded data |
 | AI-generated code that looks right but is wrong | Every change is reviewed and run, and tests are written against the requirements rather than the implementation (see `ai-workflow.md`) |
 | Running out of time before deployment | Deploy early (after milestone 4) rather than at the end |
