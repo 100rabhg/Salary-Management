@@ -7,10 +7,24 @@
 class EmployeeDirectoryQuery
   DEFAULT_PER_PAGE = 25
   MAX_PER_PAGE = 100
+  # Each sort is a list of SQL expressions, all ordered in the requested
+  # direction, with employees.id as the final tie-breaker.
+  #  - country sorts by country name, not code (DE is Germany);
+  #  - salary sorts by the current salary's currency, then amount, because
+  #    amounts in different currencies can't be compared. Employees with no
+  #    current salary come last.
   SORTS = {
-    "name" => %w[last_name first_name],
-    "hire_date" => %w[hire_date],
-    "created_at" => %w[created_at]
+    "name" => %w[employees.last_name employees.first_name],
+    "job_title" => %w[employees.job_title employees.department],
+    "country" => [
+      "CASE employees.country_code " +
+        Country::ALL.sort_by { |_, country| country[:name] }.each_with_index
+          .map { |(code, _), index| "WHEN '#{code}' THEN #{index}" }.join(" ") +
+        " END"
+    ],
+    "hire_date" => %w[employees.hire_date],
+    "salary" => %w[current_salary.currency current_salary.salary],
+    "created_at" => %w[employees.created_at]
   }.freeze
   FILTERS = %i[country_code department job_title employment_type].freeze
 
@@ -80,8 +94,8 @@ class EmployeeDirectoryQuery
   end
 
   def order_clause
-    columns = SORTS.fetch(@params[:sort].to_s, SORTS["name"])
-    direction = @params[:direction].to_s.downcase == "desc" ? :desc : :asc
-    columns.to_h { |column| [ column, direction ] }.merge(id: direction)
+    expressions = SORTS.fetch(@params[:sort].to_s, SORTS["name"])
+    direction = @params[:direction].to_s.downcase == "desc" ? "DESC" : "ASC"
+    Arel.sql((expressions.map { |expression| "#{expression} #{direction} NULLS LAST" } + [ "employees.id #{direction}" ]).join(", "))
   end
 end

@@ -90,6 +90,32 @@ RSpec.describe "Employees API", type: :request do
       get "/api/v1/employees", params: { sort: "salary; DROP TABLE employees" }
       expect(response.parsed_body["data"].map { |row| row["last_name"] }).to eq(%w[Abe Zed])
     end
+
+    it "sorts by role and by country name" do
+      create_employee(last_name: "Germany", country_code: "DE", job_title: "Recruiter")
+      create_employee(last_name: "France", email: "fr@acme.example", country_code: "FR", job_title: "Accountant")
+      create_employee(last_name: "India", email: "in@acme.example", country_code: "IN", job_title: "QA Engineer")
+
+      get "/api/v1/employees", params: { sort: "country" }
+      expect(response.parsed_body["data"].map { |row| row["last_name"] }).to eq(%w[France Germany India])
+
+      get "/api/v1/employees", params: { sort: "job_title", direction: "desc" }
+      expect(response.parsed_body["data"].map { |row| row["job_title"] }).to eq([ "Recruiter", "QA Engineer", "Accountant" ])
+    end
+
+    it "sorts by current salary within each currency, with no current salary last" do
+      create_employee(last_name: "Gbp", salary: 50_000, currency: "GBP")
+      create_employee(last_name: "UsdHigh", email: "a@acme.example", salary: 90_000, currency: "USD")
+      create_employee(last_name: "UsdLow", email: "b@acme.example", salary: 80_000, currency: "USD")
+      later = create_employee(last_name: "NoCurrent", email: "c@acme.example", hire_date: Date.current.iso8601)
+      later.employee_salaries.sole.update!(effective_on: Date.current + 5)
+
+      get "/api/v1/employees", params: { sort: "salary" }
+      expect(response.parsed_body["data"].map { |row| row["last_name"] }).to eq(%w[Gbp UsdLow UsdHigh NoCurrent])
+
+      get "/api/v1/employees", params: { sort: "salary", direction: "desc" }
+      expect(response.parsed_body["data"].map { |row| row["last_name"] }).to eq(%w[UsdHigh UsdLow Gbp NoCurrent])
+    end
   end
 
   describe "GET /api/v1/employees/:id" do
