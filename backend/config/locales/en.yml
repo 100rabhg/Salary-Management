@@ -1,31 +1,12 @@
-# Files in the config/locales directory are used for internationalization and
-# are automatically loaded by Rails. If you want to use locales other than
-# English, add the necessary files in this directory.
-#
-# To use the locales, use `I18n.t`:
-#
-#     I18n.t "hello"
-#
-# In views, this is aliased to just `t`:
-#
-#     <%= t("hello") %>
-#
-# To use a different locale, set it with `I18n.locale`:
-#
-#     I18n.locale = :es
-#
-# This would use the information in config/locales/es.yml.
-#
-# To learn more about the API, please read the Rails Internationalization guide
-# at https://guides.rubyonrails.org/i18n.html.
-#
-# Be aware that YAML interprets the following case-insensitive strings as
-# booleans: `true`, `false`, `on`, `off`, `yes`, `no`. Therefore, these strings
-# must be quoted to be interpreted as strings. For example:
-#
-#     en:
-#       "yes": yup
-#       enabled: "ON"
-
+# Attribute names as HR sees them in the UI, used in full error messages
+# (e.g. "Effective date can't be before the joining date").
 en:
-  hello: "Hello world"
+  activerecord:
+    attributes:
+      employee:
+        country_code: "Country"
+        hire_date: "Joining date"
+        email: "Email"
+      employee_salary:
+        effective_on: "Effective date"
+        salary: "Salary"
