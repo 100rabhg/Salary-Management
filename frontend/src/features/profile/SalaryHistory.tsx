@@ -51,7 +51,7 @@ interface SalaryHistoryProps {
 export function SalaryHistory({ records, onEdit, onCancel }: SalaryHistoryProps) {
   return (
     <Table.ScrollContainer minWidth={620}>
-      <Table verticalSpacing="sm">
+      <Table verticalSpacing="sm" horizontalSpacing="md">
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Effective from</Table.Th>

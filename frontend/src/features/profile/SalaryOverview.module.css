@@ -1,0 +1,16 @@
+.pending {
+  flex: 0 1 380px;
+  min-width: 260px;
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+  background: var(--mantine-color-orange-0);
+  border: 1px solid var(--mantine-color-orange-2);
+  border-left: 3px solid var(--mantine-color-orange-6);
+  border-radius: var(--mantine-radius-md);
+}
+
+@media (max-width: 36em) {
+  .pending {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+}

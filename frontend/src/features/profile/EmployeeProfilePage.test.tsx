@@ -26,6 +26,7 @@ describe('EmployeeProfilePage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Ada Okafor' })).toBeInTheDocument()
     expect(await screen.findByText('Since 1 Apr 2024')).toBeInTheDocument()
+    expect(screen.getByText('from the previous salary')).toBeInTheDocument()
     expect(screen.getByText(/From 1 Dec 2026 · can be edited or cancelled until then/)).toBeInTheDocument()
 
     const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
@@ -33,6 +34,13 @@ describe('EmployeeProfilePage', () => {
     expect(within(rows[0]!).getByText('+5.0%')).toBeInTheDocument()
     expect(within(rows[0]!).getByRole('button', { name: /Cancel scheduled change/ })).toBeInTheDocument()
     expect(within(rows[1]!).queryByRole('button', { name: /Cancel/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the starting salary without an empty scheduled-change slot', async () => {
+    setup([buildRecord({ id: 10, effective_on: '2022-01-03' })])
+
+    expect(await screen.findByText('Starting salary')).toBeInTheDocument()
+    expect(screen.queryByText('Scheduled change')).not.toBeInTheDocument()
   })
 
   it('schedules a salary change for a future date', async () => {

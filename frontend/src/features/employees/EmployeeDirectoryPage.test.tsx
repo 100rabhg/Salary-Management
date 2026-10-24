@@ -26,7 +26,7 @@ describe('EmployeeDirectoryPage', () => {
 
     const row = (await screen.findByRole('link', { name: 'Ada Okafor' })).closest('tr')!
     expect(within(row).getByText('₹12,00,000')).toBeInTheDocument()
-    expect(within(row).getByText('1 Dec 2026')).toBeInTheDocument()
+    expect(within(row).getByText(/₹13,00,000 from 1 Dec 2026/)).toBeInTheDocument()
     expect(screen.getByText('Not yet effective')).toBeInTheDocument()
     expect(screen.getByText('Showing 1–25 of 60')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Ada Okafor' })).toHaveAttribute('href', '/employees/1')
@@ -66,6 +66,20 @@ describe('EmployeeDirectoryPage', () => {
         'okafor',
       ]),
     )
+  })
+
+  it('sorts by any column header, toggling the direction', async () => {
+    mockApi({ 'GET /meta': { body: meta }, 'GET /employees': page([buildEmployee()]) })
+    const { user } = renderApp(<EmployeeDirectoryPage />, { route: '/employees', path: '/employees' })
+    await screen.findByRole('link', { name: 'Ada Okafor' })
+
+    for (const [label, sort] of [['Role', 'job_title'], ['Country', 'country'], ['Salary', 'salary']]) {
+      await user.click(screen.getByRole('button', { name: label }))
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`sort=${sort}&direction=asc`))
+    }
+    await user.click(screen.getByRole('button', { name: 'Salary' }))
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('sort=salary&direction=desc'))
+    expect(screen.getByRole('button', { name: 'Salary' }).closest('th')).toHaveAttribute('aria-sort', 'descending')
   })
 
   it('offers to clear filters when nothing matches', async () => {

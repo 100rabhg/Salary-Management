@@ -289,7 +289,6 @@ function EmployeeForm({ meta, employee, onCancel, onSaved, isDirtyRef }: Employe
             searchable
             placeholder="Choose a country"
             data={meta.countries.map((c) => ({ value: c.code, label: c.name }))}
-            description={editing ? "Doesn't change any salary record." : undefined}
             {...form.getInputProps('country_code')}
             onChange={(code) => {
               form.setFieldValue('country_code', code)

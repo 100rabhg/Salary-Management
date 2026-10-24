@@ -4,7 +4,7 @@ import type { DirectoryParams, DirectorySort } from '../../api/types'
 
 export const PAGE_SIZES = [10, 25, 50, 100]
 const DEFAULT_PAGE_SIZE = 25
-const SORTS: DirectorySort[] = ['name', 'hire_date', 'created_at']
+const SORTS: DirectorySort[] = ['name', 'job_title', 'country', 'hire_date', 'salary', 'created_at']
 export const FILTER_KEYS = ['country_code', 'department', 'job_title', 'employment_type'] as const
 export type FilterKey = (typeof FILTER_KEYS)[number]
 

@@ -16,15 +16,12 @@ import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
 import {
   IconBriefcase,
-  IconTrendingUp,
-  IconCalendarClock,
   IconCalendarEvent,
   IconMail,
   IconMapPin,
   IconPencil,
   IconPlus,
   IconTrash,
-  IconWallet,
 } from '@tabler/icons-react'
 import { useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
@@ -42,7 +39,8 @@ import { QueryError } from '../../components/QueryError'
 import { EMPLOYMENT_TYPE_LABELS, formatDate, formatMoney, fullName, initials } from '../../lib/format'
 import { EmployeeFormModal } from '../employees/EmployeeFormModal'
 import { SalaryFormModal } from '../salaries/SalaryFormModal'
-import { ChangeText, SalaryHistory } from './SalaryHistory'
+import { SalaryHistory } from './SalaryHistory'
+import { SalaryOverview } from './SalaryOverview'
 
 export function EmployeeProfilePage() {
   const id = Number(useParams().id)
@@ -116,9 +114,6 @@ function EmployeeProfile({ id }: { id: number }) {
 
   const person = employee.data
   const records = history.data ?? []
-  const pending = records.find((record) => record.status === 'pending')
-  const current = records.find((record) => record.status === 'current')
-  const latestChange = records.find((record) => record.status !== 'pending' && record.change)
 
   return (
     <Stack gap="lg">
@@ -179,63 +174,11 @@ function EmployeeProfile({ id }: { id: number }) {
             </SimpleGrid>
           </Card>
 
-          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
-            <SummaryCard icon={<IconWallet size={18} />} label="Current salary" accent="brand">
-              {current ? (
-                <>
-                  <Amount>{formatMoney(current.salary, current.currency)}</Amount>
-                  <Text size="xs" c="dimmed">Since {formatDate(current.effective_on)}</Text>
-                </>
-              ) : history.isPending ? (
-                <Skeleton height={28} width="70%" />
-              ) : (
-                <Text size="sm" c="dimmed">No salary has taken effect yet.</Text>
-              )}
-            </SummaryCard>
-            <SummaryCard icon={<IconCalendarClock size={18} />} label="Scheduled change" accent="orange">
-              {pending ? (
-                <>
-                  <Group gap="xs" align="baseline">
-                    <Amount>{formatMoney(pending.salary, pending.currency)}</Amount>
-                    <ChangeText change={pending.change} />
-                  </Group>
-                  <Text size="xs" c="dimmed">
-                    From {formatDate(pending.effective_on)} · can be edited or cancelled until then
-                  </Text>
-                  <Group gap="xs" mt={6}>
-                    <Button size="compact-sm" variant="light" color="orange" onClick={() => setSalaryModal({ record: pending })}>
-                      Edit
-                    </Button>
-                    {pending.cancellable && (
-                      <Button size="compact-sm" variant="subtle" color="red" onClick={() => confirmCancel(pending)}>
-                        Cancel change
-                      </Button>
-                    )}
-                  </Group>
-                </>
-              ) : history.isPending ? (
-                <Skeleton height={28} width="60%" />
-              ) : (
-                <Text size="sm" c="dimmed">None. Use “Add salary change” with a future date to schedule one.</Text>
-              )}
-            </SummaryCard>
-            <SummaryCard icon={<IconTrendingUp size={18} />} label="Last change" accent="navy">
-              {latestChange ? (
-                <>
-                  <Group gap="xs" align="baseline">
-                    <ChangeText change={latestChange.change} />
-                  </Group>
-                  <Text size="xs" c="dimmed">
-                    On {formatDate(latestChange.effective_on)} to {formatMoney(latestChange.salary, latestChange.currency)}
-                  </Text>
-                </>
-              ) : history.isPending ? (
-                <Skeleton height={28} width="50%" />
-              ) : (
-                <Text size="sm" c="dimmed">No change since the starting salary.</Text>
-              )}
-            </SummaryCard>
-          </SimpleGrid>
+          <SalaryOverview
+            records={history.isError ? [] : history.data}
+            onEditPending={(record) => setSalaryModal({ record })}
+            onCancelPending={confirmCancel}
+          />
 
           <Card padding={0}>
             <Group justify="space-between" p="md" gap="sm">
@@ -307,37 +250,11 @@ function Detail({ icon, label, children }: { icon: ReactNode; label: string; chi
   )
 }
 
-function SummaryCard({ icon, label, accent, children }: { icon: ReactNode; label: string; accent: string; children: ReactNode }) {
-  return (
-    <Card style={{ borderTop: `3px solid var(--mantine-color-${accent}-6)` }}>
-      <Group gap={6} mb={6} c={`${accent}.8`}>
-        {icon}
-        <Text size="sm" fw={600}>
-          {label}
-        </Text>
-      </Group>
-      <Stack gap={2}>{children}</Stack>
-    </Card>
-  )
-}
-
-function Amount({ children }: { children: ReactNode }) {
-  return (
-    <Text fz={24} fw={600} c="navy.9" className="tabular-nums" lh={1.25}>
-      {children}
-    </Text>
-  )
-}
-
 function ProfileSkeleton() {
   return (
     <Stack gap="lg" aria-busy aria-label="Loading employee">
       <Skeleton height={150} radius="md" />
-      <SimpleGrid cols={{ base: 1, sm: 3 }}>
-        <Skeleton height={110} radius="md" />
-        <Skeleton height={110} radius="md" />
-        <Skeleton height={110} radius="md" />
-      </SimpleGrid>
+      <Skeleton height={110} radius="md" />
       <Skeleton height={240} radius="md" />
     </Stack>
   )

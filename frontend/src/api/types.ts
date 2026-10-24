@@ -62,7 +62,7 @@ export interface Meta {
   job_titles: string[]
 }
 
-export type DirectorySort = 'name' | 'hire_date' | 'created_at'
+export type DirectorySort = 'name' | 'job_title' | 'country' | 'hire_date' | 'salary' | 'created_at'
 
 export interface DirectoryParams {
   q?: string
