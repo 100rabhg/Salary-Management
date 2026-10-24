@@ -9,11 +9,11 @@ Requirements come first, then one complete vertical slice at a time: backend, te
 | # | Milestone | Key outputs | Status |
 | --- | --- | --- | --- |
 | 1 | Requirements and planning | `requirements.md`, `architecture.md`, this plan, Git repo | Done |
-| 2 | Application setup | Rails API and React app scaffolded, CI (lint, type check, security scans), both run locally | Mostly done (needs a CI run on GitHub and the local DB checked) |
-| 3a | Employee and salary data model | `Employee` and `EmployeeSalary` models, two-table schema, `Country` list, deterministic seed script with one starting salary period per employee, model specs | Draft for review |
-| 3b | Salary history | Add salary periods for later changes, current-effective-salary lookup, effective-date handling, and model specs | Draft for review |
-| 3c | Employee API | CRUD and salary-history endpoints, transactional employee/initial-salary creation and country changes, request specs, API section in `architecture.md` | Not started |
-| 4 | Frontend core workflows | Employee directory (search, filters, pagination), create/edit/delete, loading, empty, and error states | Not started |
+| 2 | Application setup | Rails API and React app scaffolded, CI (lint, type check, security scans), both run locally | Done locally (needs a CI run on GitHub) |
+| 3a | Employee and salary data model | `Employee` and `EmployeeSalary` models, two-table schema, `Country` list, deterministic seed script with one starting salary period per employee, model specs | Done |
+| 3b | Salary history | Salary periods for later changes, current-effective-salary lookup, effective-date handling, and model specs | Done |
+| 3c | Employee API | Salary-period rules (editable periods, one pending period under a row lock, cancel pending, currency independent of country), CRUD and salary endpoints, transactional employee and first-salary creation, request specs, CI test job, API section in `architecture.md` | Done |
+| 4 | Frontend core workflows | App shell with demo HR profile, employee directory (search, filters, sorting, server-side pagination), profile with current, scheduled and past salaries, modals to add and edit employees and salary periods, loading, empty, error and help states, Vitest tests in CI | Done |
 | 5 | Salary insights | Insights endpoints (query objects), Insights page, figures checked against the data | Not started |
 | 6 | Testing and quality | Gaps in test coverage closed, error handling reviewed, behaviour verified with 10k records | Not started |
 
@@ -34,7 +34,8 @@ Requirements come first, then one complete vertical slice at a time: backend, te
 
 | Risk | Mitigation |
 | --- | --- |
-| Aggregates silently mix currencies | All statistics are grouped or scoped by country, and specs assert that this holds |
+| Aggregates silently mix currencies | Salary currency is independent of country, so every statistic is grouped by currency as well as country, and specs will assert this |
+| Concurrent saves create two pending salary periods | Every salary write locks the employee row; a concurrency spec proves the lock is needed and sufficient |
 | Slow list or insights queries at 10k rows | Server-side pagination, indexes on filter columns, SQL aggregation, and timings measured on seeded data |
 | AI-generated code that looks right but is wrong | Every change is reviewed and run, and tests are written against the requirements rather than the implementation (see `ai-workflow.md`) |
 | Running out of time before deployment | Deploy early (after milestone 4) rather than at the end |
