@@ -1,6 +1,10 @@
-# Supported countries and their currencies. The single source of truth for
-# validation, seeding and (later) the UI's country options. Adding a country
-# is a code change only; there is no matching database constraint.
+# Supported countries, their usual currencies and the supported salary
+# currencies. The single source of truth for validation, seeding and the UI's
+# options (served by /api/v1/meta). Adding a country or currency is a code
+# change only; there is no matching database constraint.
+#
+# A country's currency is only the default for new salary records: HR can pay
+# an employee in any supported currency (see EmployeeSalary).
 module Country
   ALL = {
     "US" => { name: "United States", currency: "USD" },
@@ -13,6 +17,11 @@ module Country
     "SG" => { name: "Singapore", currency: "SGD" }
   }.freeze
 
+  CURRENCIES = ALL.values.map { |country| country[:currency] }.uniq.freeze
+
+  # Used when a salary record has no currency and the country gives no hint.
+  DEFAULT_CURRENCY = "INR"
+
   # Currencies with no minor unit: amounts must be whole numbers.
   ZERO_DECIMAL_CURRENCIES = %w[JPY].freeze
 
@@ -20,8 +29,16 @@ module Country
     ALL.keys
   end
 
+  def self.name_for(code)
+    ALL.dig(code, :name)
+  end
+
   def self.currency_for(code)
     ALL.dig(code, :currency)
+  end
+
+  def self.default_currency_for(code)
+    currency_for(code) || DEFAULT_CURRENCY
   end
 
   def self.zero_decimal?(currency)

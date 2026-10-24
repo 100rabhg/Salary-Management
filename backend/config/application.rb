@@ -40,5 +40,9 @@ module SalaryManagement
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # The business time zone. It decides what "today" is, and so whether a
+    # salary record is past, current or pending (see EmployeeSalary).
+    config.time_zone = ENV.fetch("APP_TIME_ZONE", "Asia/Kolkata")
   end
 end

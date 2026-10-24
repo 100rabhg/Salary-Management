@@ -18,4 +18,18 @@ RSpec.describe Country do
     expect(described_class.zero_decimal?("JPY")).to be(true)
     expect(described_class.zero_decimal?("USD")).to be(false)
   end
+
+  it "lists each supported currency once" do
+    expect(described_class::CURRENCIES).to eq(%w[USD GBP EUR INR JPY SGD])
+  end
+
+  it "defaults a salary currency to the country's currency, or INR" do
+    expect(described_class.default_currency_for("IN")).to eq("INR")
+    expect(described_class.default_currency_for("DE")).to eq("EUR")
+    expect(described_class.default_currency_for(nil)).to eq("INR")
+  end
+
+  it "returns the country name" do
+    expect(described_class.name_for("GB")).to eq("United Kingdom")
+  end
 end

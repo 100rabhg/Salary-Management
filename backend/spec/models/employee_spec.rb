@@ -132,4 +132,79 @@ RSpec.describe Employee do
       expect(errors_for(valid_attributes(hire_date: Date.current + 1), :hire_date)).to include("can't be in the future")
     end
   end
+
+  describe ".create_with_first_salary" do
+    it "creates the employee and a first salary record effective on the joining date" do
+      result = described_class.create_with_first_salary(valid_attributes, { salary: 72_000, currency: "GBP" })
+
+      expect(result).to be_saved
+      expect(result.employee.employee_salaries.sole)
+        .to have_attributes(salary: BigDecimal("72000"), currency: "GBP", effective_on: Date.new(2020, 3, 1))
+    end
+
+    it "defaults the currency from the country" do
+      result = described_class.create_with_first_salary(valid_attributes(country_code: "IN"), { salary: 1_500_000 })
+
+      expect(result.first_salary.currency).to eq("INR")
+    end
+
+    it "saves nothing when either record is invalid, and reports both" do
+      result = nil
+      expect {
+        result = described_class.create_with_first_salary(valid_attributes(email: "bad"), { salary: 0 })
+      }.not_to change(described_class, :count)
+
+      expect(result).not_to be_saved
+      expect(result.employee.errors[:email]).to be_present
+      expect(result.first_salary.errors[:salary]).to be_present
+      expect(EmployeeSalary.count).to eq(0)
+    end
+  end
+
+  describe "#update_with_lock" do
+    let(:employee) { described_class.create_with_first_salary(valid_attributes, { salary: 72_000 }).employee }
+
+    it "moves the first salary record when the joining date is corrected" do
+      expect(employee.update_with_lock(hire_date: Date.new(2020, 3, 10))).to be(true)
+
+      expect(employee.employee_salaries.reload.sole.effective_on).to eq(Date.new(2020, 3, 10))
+    end
+
+    it "leaves the first salary record alone once it no longer matches the joining date" do
+      employee.employee_salaries.sole.update!(effective_on: Date.new(2020, 6, 1))
+
+      expect(employee.update_with_lock(hire_date: Date.new(2020, 2, 1))).to be(true)
+      expect(employee.employee_salaries.reload.sole.effective_on).to eq(Date.new(2020, 6, 1))
+    end
+
+    it "rejects a joining date after the first salary record" do
+      employee.employee_salaries.sole.update!(effective_on: Date.new(2020, 6, 1))
+
+      expect(employee.update_with_lock(hire_date: Date.new(2020, 7, 1))).to be(false)
+      expect(employee.errors[:hire_date]).to include("can't be after the first salary record (2020-06-01)")
+    end
+
+    it "reports a clash when the moved first record would land on another record's date" do
+      EmployeeSalary.create!(employee:, salary: 75_000, effective_on: Date.new(2021, 1, 1))
+
+      expect(employee.update_with_lock(hire_date: Date.new(2021, 1, 1))).to be(false)
+      expect(employee.errors[:hire_date].first).to start_with("can't move the first salary record")
+      expect(employee.employee_salaries.reload.map(&:effective_on)).to eq([ Date.new(2021, 1, 1), Date.new(2020, 3, 1) ])
+    end
+
+    it "changes the country without touching any salary record" do
+      EmployeeSalary.create!(employee:, salary: 90_000, effective_on: Date.current + 7)
+
+      expect { employee.update_with_lock(country_code: "IN") }
+        .not_to(change { employee.employee_salaries.reload.map { |record| record.attributes.except("employee_id") } })
+      expect(employee.reload.country_code).to eq("IN")
+    end
+
+    it "rejects an update based on an outdated copy" do
+      described_class.find(employee.id).update!(job_title: "QA Engineer")
+
+      expect { employee.update_with_lock(job_title: "Engineering Manager", lock_version: 0) }
+        .to raise_error(ActiveRecord::StaleObjectError)
+    end
+  end
 end

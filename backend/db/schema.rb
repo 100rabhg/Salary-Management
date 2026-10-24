@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_23_184057) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_24_134634) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -21,7 +21,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_184057) do
     t.date "effective_on", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["employee_id", "effective_on", "id"], name: "index_employee_salaries_on_employee_and_effective_date"
+    t.integer "lock_version", default: 0, null: false
+    t.index ["employee_id", "effective_on"], name: "index_employee_salaries_on_employee_and_effective_date", unique: true
     t.check_constraint "salary > 0::numeric", name: "employee_salaries_salary_positive"
   end
 
@@ -36,6 +37,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_23_184057) do
     t.date "hire_date", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "lock_version", default: 0, null: false
     t.index "lower((email)::text)", name: "index_employees_on_lower_email", unique: true
     t.index ["country_code", "department"], name: "index_employees_on_country_code_and_department"
     t.index ["country_code", "job_title"], name: "index_employees_on_country_code_and_job_title"
