@@ -6,6 +6,14 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       get "meta", to: "meta#show"
+      get "exchange_rates/current", to: "exchange_rates#current"
+
+      scope "insights", controller: "insights", as: "insights" do
+        get "summary"
+        get "department_costs"
+        get "role_salary_ranges"
+        get "country_salary_distribution"
+      end
 
       resources :employees, only: %i[index show create update destroy] do
         resources :salaries, only: %i[index create update destroy], controller: "employee_salaries"

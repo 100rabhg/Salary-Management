@@ -1,0 +1,28 @@
+{
+  "ignored_warnings": [
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "9c8412849e5ba0e22c2736f52256cad6132f8d5dccb51c82cc9809afdbdbc83a",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/queries/insights/report.rb",
+      "line": 54,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "connection.select_values(\"WITH #{current_salaries_cte}\\nSELECT DISTINCT cur.currency FROM employees e JOIN cur ON cur.employee_id = e.id #{where_clause}\\n\".squish)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Insights::Report",
+        "method": "currencies_present"
+      },
+      "user_input": "current_salaries_cte",
+      "confidence": "Medium",
+      "cwe_id": [
+        89
+      ],
+      "note": "Not injectable: the date is quoted with connection.quote, filter values are bound with sanitize_sql_array, and filter column names come from each report's fixed allowlist (Insights::Report#allowed_filters)."
+    }
+  ],
+  "brakeman_version": "8.1.0"
+}

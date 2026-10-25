@@ -3,6 +3,29 @@ module Api
     # Every error response has the same shape:
     #   { "error": { "code": "...", "message": "...", "details": { "field": ["..."] } } }
     class BaseController < ApplicationController
+      # A query parameter with a value the API doesn't accept.
+      class InvalidParameter < StandardError
+        attr_reader :field
+
+        def initialize(field, message)
+          @field = field
+          super(message)
+        end
+      end
+
+      # A pinned exchange-rate set the in-memory cache no longer holds.
+      class UnknownRatesToken < StandardError; end
+
+      rescue_from UnknownRatesToken do
+        render_error :conflict, "unknown_rates_token",
+          "These exchange rates are no longer available (the server may have restarted). Load the current rates and try again"
+      end
+
+      rescue_from InvalidParameter do |error|
+        render_error :unprocessable_content, "invalid_parameter",
+          "#{error.field.to_s.humanize} #{error.message}", { error.field => [ error.message ] }
+      end
+
       rescue_from ActiveRecord::RecordNotFound do
         render_error :not_found, "not_found", "The requested record was not found"
       end
