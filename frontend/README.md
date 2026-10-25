@@ -33,6 +33,12 @@ Values are fixed at build time.
 | `npm run typecheck` | TypeScript project check |
 | `npm run build` | Type check and production build to `dist/` |
 
+## Pages
+
+- `/`: Dashboard, with headcount and estimated monthly and annual salary cost in a chosen display currency.
+- `/employees`: directory, and `/employees/:id`, the profile and salary history.
+- `/insights`: monthly cost by department, annual salary range by role, and annual salary distribution by country.
+
 ## Layout
 
 See "Frontend structure" and "UI design" in [`docs/architecture.md`](../docs/architecture.md#frontend-structure).

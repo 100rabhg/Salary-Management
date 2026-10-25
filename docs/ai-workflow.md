@@ -122,3 +122,38 @@ How AI tools are used on this project, and how their output is checked. This is 
 **Review round on the UI**
 - After using the app, I asked for the directory's current-salary and scheduled-change columns to be merged into one salary column, for sorting on every column, for the profile's scheduled-change and last-change cards to stop looking empty when there's no data, and for more left padding in both tables. I had also removed the country hint from the edit-employee form.
 - The AI added server-side sorts for role, country (by name, not code) and salary. Salary sorts by currency and then amount, so different currencies are never ranked against each other. It merged the profile's three cards into one salary card in which the scheduled change appears only when there is one, and widened the table padding. It checked the result in screenshots with and without a scheduled change, at desktop and phone widths, and timed the new sorts on 10,000 rows (under 70 ms).
+
+### Milestone 5: Dashboard and insights
+
+**Prompts given**
+- A planning prompt with no file changes: a Dashboard (headcount, estimated monthly cost) and an Insights page with three reports, shown in one display currency (default INR) without converting stored salaries, plus an evaluation of Frankfurter for daily rates cached without Redis.
+- A revision prompt: Frankfurter limited to the six supported currencies with the ECB provider selected explicitly; complete, validated, dated snapshots in the database with fallback to the last good one; `/` as the Dashboard with summary cards only; per-report filters, with the country report grouping by country rather than filtering to one; one snapshot for every chart on a page; a defined response when no snapshot exists; annual ranges versus monthly costs; and percentile precision and JPY rounding.
+- An implementation prompt that approved the plan's recommendations, asked for **exact numeric percentiles**, tests for calculations, filtering, rate failures, stale data, UI states and 10,000-row performance, and asked for the work to be left uncommitted.
+
+**What AI produced**
+- Updates to `requirements.md`, `architecture.md` (insight calculations, an Exchange rates section, the new endpoints and configuration) and `planning.md`, plus the new `performance-considerations.md`.
+- `exchange_rate_snapshots` and `exchange_rates` tables, the Frankfurter client, snapshot validation and refresh, the cache-first resolver with an advisory lock and failure backoff, and a `bin/rails exchange_rates:refresh` task.
+- Insight query objects (`app/queries/insights/`): a shared current-salary CTE, conversion in `numeric` before aggregation, exact interpolated percentiles, and per-report filter allowlists. Endpoints under `/api/v1/insights` and `/api/v1/exchange_rates/current`.
+- The Dashboard and Insights pages: display-currency picker, rates note, snapshot pinning, per-report URL filters, accessible bar and range charts with table views, and loading, error, empty, stale and rates-unavailable states.
+- Specs and tests worked out by hand from known data (see below).
+
+**What AI caught**
+- Frankfurter's v2 API **blends several providers by default**: without `providers=ECB` it returned a Sunday-dated rate that isn't an ECB rate. The request always names ECB, and the validation rejects weekend dates as a second guard.
+- Frankfurter's cross rates are rounded (USD→INR 94.94 against an exact 94.945), so the app stores ECB's EUR-based rates and computes cross rates in `numeric`.
+- PostgreSQL's `percentile_cont` returns `double precision` for `numeric` input, and float rounding is half-to-even. Percentiles are computed by interpolating in `numeric` instead, and every figure is rounded once, half away from zero, to the display currency's minor unit (0 for JPY).
+- The first lock spec passed for the wrong reason: Rails shares one database connection between threads in tests, and advisory locks are re-entrant within a session. It now holds the lock from a separate PostgreSQL connection.
+- A frontend test leaked the chosen currency to the next test through `localStorage`; storage is now cleared between tests.
+- Screenshots showed `Intl` formatting 6,435 crore as "₹6.4KCr"; large INR amounts are now shown in crores.
+
+**What was corrected or checked**
+- The plan named `@mantine/charts`. The charts were built as small HTML/CSS components instead, following the dataviz skill's mark specs (bars at most 24px, 4px rounded ends, hairline gridlines, no value on every mark, tooltip plus table view). This gives exact control, works in jsdom tests and keeps Recharts out of the bundle.
+- On the 10,000-row development data the exact percentiles agree with `percentile_cont` to within rounding (largest difference ₹0.0049), and every report answers in about 35–110 ms over HTTP.
+- A running development server that had booted before `app/services/` existed returned 500s for the new endpoints. A fresh server served them correctly, so this was not a code fault: restart the server after pulling.
+- Backend: 173 RSpec examples, 0 failures, including the 10,000-row performance spec. RuboCop is clean. Brakeman reports no warnings, with one documented ignore for a query built from quoted and allowlisted values. bundler-audit finds no vulnerabilities. Frontend: lint, type check, 51 Vitest tests and the production build pass.
+
+**Refactor: exchange rates in memory instead of the database**
+- Prompt: replace the database-backed rate storage with Rails `memory_store` only (no Redis, no cache table), configured the same way in development, test and production, with an opaque cache token in place of snapshot IDs. Roll back only the exchange-rate migration locally, without touching employee or salary data.
+- The migration was reverted with `db:migrate:down` for that one version in development and test, which dropped only `exchange_rates` and `exchange_rate_snapshots`. The migration file was deleted, and `schema.rb` is back to the committed version. Employee and salary counts were checked before and after (10,001 and 10,006 in development).
+- Rates are now one `RateSet` value per validated response in `Rails.cache`, keyed by a SHA-256 token of the data. The refresh lock became a per-process `Mutex`, and the failure backoff a cache entry that expires after 5 minutes. A token the cache no longer holds returns 409, and the page re-pins.
+- **What AI caught:** `32.megabytes` isn't available in the environment files at load time, so the size is written in bytes. `Data` objects are frozen, so the token isn't memoized. The first frontend re-pin version made every 409 refetch every report, including those still keyed by the old token, which looped until the test worker ran out of memory. Re-pinning now runs once at a time, at most once a minute per token, and reruns only reports pinned to the new token.
+- **Checked live:** after a server restart the old token got 409, and fetching rates again produced the same token, because the rates were the same. Backend: 176 examples, 0 failures; RuboCop, Brakeman and bundler-audit are clean. Frontend: lint, type check, 53 tests and the build pass.
