@@ -34,3 +34,8 @@ group :development, :test do
 end
 
 gem "rspec-rails", "~> 8.0", groups: [ :development, :test ]
+
+group :test do
+  # Stubs HTTP so specs never call the exchange-rate provider
+  gem "webmock", "~> 3.34"
+end

@@ -23,8 +23,7 @@ Rails.application.configure do
     config.action_controller.perform_caching = false
   end
 
-  # Change to :null_store to avoid any caching.
-  config.cache_store = :memory_store
+  config.cache_store = :memory_store, { size: 32 * 1024 * 1024 } # 32 MB
 
   # Don't care if the mailer can't send.
   config.action_mailer.raise_delivery_errors = false
