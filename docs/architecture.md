@@ -174,12 +174,22 @@ Name search uses `ILIKE` on first name, last name, full name and email, with LIK
 
 ### How insights use the model
 
-When implemented, insight figures should be computed with SQL aggregation over employees joined to their latest salary period effective today:
+Every report starts from the same set: each employee joined to their **current salary**, the latest period with `effective_on <= today` (a `DISTINCT ON (employee_id)` CTE in `Insights::Report`; on the 10,000-row seed it aggregates in about 10 ms, against 17 ms for a `LATERAL` lookup per employee). Pending and superseded periods never count.
 
-- **Per country:** `GROUP BY country_code, currency` with `COUNT`, `SUM`, `MIN`, `MAX`, `AVG`, and `percentile_cont(0.5)` for the median.
-- **Per job title or department:** the same aggregates, filtered to one `country_code` and grouped by currency.
+Each salary is then **converted before anything is combined**. A `rates` CTE built from the pinned rate set (see [Exchange rates](#exchange-rates)) holds each currency's EUR-based rate, and the converted annual salary is `salary * eur_rate(display) / eur_rate(salary currency)`, computed in `numeric` (multiply first, then divide). Salaries already in the display currency are multiplied by exactly 1. Stored salaries are never written.
 
-Because a salary's currency is independent of the employee's country, a country can have employees paid in more than one currency. Grouping by currency as well as country keeps every statistic in a single currency. Specs will assert this explicitly. At 10,000 rows the whole table is a few megabytes, so aggregating on request is well within budget and there is no need for precomputed summaries that could go stale.
+| Statistic | How it is calculated |
+| --- | --- |
+| Headcount | `COUNT(*)` over employees; those without a current salary are counted separately |
+| Monthly cost | `SUM(converted) / 12`, exact `numeric`, rounded once |
+| Mean, minimum, maximum | `AVG`, `MIN`, `MAX` over converted values, exact `numeric` |
+| 25th percentile, median, 75th percentile | **Exact** linear interpolation in `numeric` (below) |
+
+**Exact percentiles.** PostgreSQL's `percentile_cont` casts `numeric` input to `double precision`, so its results are floats. The reports compute the same definition in `numeric` instead. Each group's converted values are numbered in order with `row_number()` (`rn`, from 0) and counted (`n`). For a fraction `p`, the position is `h = p × (n − 1)`, and the percentile is `v[floor(h)] + (h − floor(h)) × (v[ceil(h)] − v[floor(h)])`, picked with `MIN(v) FILTER (WHERE rn = …)`. For {10, 20, 30, 100} this gives 17.5, 25 and 47.5, which matches `percentile_cont` but with no float step.
+
+**Rounding.** Figures are rounded once, at the end, half away from zero, to the display currency's minor unit: 2 decimals, or 0 for JPY. Original-currency figures are rounded to their own currency's minor unit. Amounts are serialized as strings with two decimals (`"1651517.00"` for JPY).
+
+At 10,000 rows aggregating on request takes tens of milliseconds, so there are no precomputed summaries that could go stale, and figures change as soon as a salary is edited.
 
 ### Seed data
 
@@ -196,7 +206,7 @@ Because a salary's currency is independent of the employee's country, a country 
 The model is deliberately small, but it is shaped so the likely next steps are additive:
 
 - **Reference data with behaviour** (for example per-department budgets, or job levels): promote the string column to a lookup table with a foreign key, using a data migration from the existing distinct values.
-- **Multi-currency reporting:** add an `exchange_rates` table and convert at query time with an explicit rate date, keeping stored salaries in the currency they were recorded in.
+- **Historical or durable rates:** reports convert with the latest ECB rates, cached in memory. Converting each salary at the rate of its own effective date, or keeping rates across restarts, would need a durable store (a table or a shared cache).
 
 ## Salary periods: rules and concurrency
 
@@ -238,6 +248,26 @@ The model spec `concurrent requests` proves this with four threads on separate c
 
 The unique `(employee_id, effective_on)` index and `lock_version` are the database backstops: the index stops same-date duplicates, and optimistic locking turns an edit based on an outdated copy into a `409 stale_record`.
 
+## Exchange rates
+
+Reports convert salaries into a display currency (one of the six supported currencies, default INR) with **ECB reference rates** fetched from [Frankfurter](https://frankfurter.dev).
+
+- **Request.** `GET {EXCHANGE_RATES_URL}/rates?base=EUR&quotes=USD,INR,GBP,JPY,SGD&providers=ECB`. Frankfurter's v2 API blends several providers unless `providers=ECB` is given; with it, every row is an ECB reference rate dated with the ECB working day it was published on (weekends return Friday's rates).
+- **Rate sets in memory, no Redis, no table.** A complete, validated response becomes one `ExchangeRates::RateSet` (provider, base, `rate_date`, `fetched_at`, and the six EUR-based rates, EUR = 1), stored as **one value** in `Rails.cache`, which is `:memory_store` (32 MB) in development, test and production. `ExchangeRates::Store` keeps each set under its token, plus the latest token, the time of the last check, and a 5-minute failure marker. Every set also stays readable by token after a newer one arrives, so pinned reports keep their rates.
+- **Token.** Each set's token is opaque to the UI: `r_` plus a SHA-256 digest of the provider, base, date and rates. The same ECB data gives the same token in every process and after a restart.
+- **Validation.** A set is cached only if the response is complete: one row for each of USD, INR, GBP, JPY and SGD, all with base EUR, the same date, a date that is neither in the future nor a weekend (ECB never publishes at weekends, so a weekend date means another provider's data), and finite positive rates. Anything else is rejected and logged, and the last cached set stays in use.
+- **Refresh.** `GET /exchange_rates/current` returns the latest cached set. It fetches first if nothing is cached or the last check was more than `EXCHANGE_RATES_REFRESH_HOURS` ago (default 6), with a 2-second connect and 3-second read timeout. One thread per process refreshes at a time (a `Mutex#try_lock`); other requests use the cached set instead of waiting. A slow or failing provider only means the cached set is used; after a failure the process waits 5 minutes before trying again.
+- **One rate set per page.** The Dashboard and Insights pages fetch `/exchange_rates/current` once and send its `rates_token` with every report request. Reports never refresh rates, so all reports on a page use the same set, even if a newer one arrives meanwhile. Each report repeats the `conversion` metadata, including the token, so this can be checked.
+- **Limitation: the cache is lost on restart, and each process has its own.** After a deploy or restart nothing is cached until the first `/exchange_rates/current` request fetches again; if Frankfurter is down at that moment, reports have no rates (`unavailable`) until it recovers. A page pinned to a token from before the restart gets a 409 and re-pins. Because tokens are digests of the data, separate Puma workers that fetched the same ECB rates agree on the token; a worker that has not fetched yet answers 409 for a token it doesn't hold, and the page re-pins through it.
+- **Freshness.** Every report includes `conversion.status`:
+
+| Status | Meaning |
+| --- | --- |
+| `current` | Rates are at most 4 days older than today (covers weekends and single holidays) |
+| `stale` | Older than that; figures are shown with a warning |
+| `not_needed` | Every salary in the result is already in the display currency; no rates are used, so this works with nothing cached |
+| `unavailable` | Rates are needed but none are cached. Converted fields are `null`; headcount and original-currency figures are still returned (HTTP 200) |
+
 ## API
 
 All endpoints are under `/api/v1` and speak JSON. Amounts are decimal **strings** with two decimals (`"72000.00"`), so no client parses money into a float by accident; dates are `YYYY-MM-DD`.
@@ -270,6 +300,13 @@ All endpoints are under `/api/v1` and speak JSON. Amounts are decimal **strings*
 | `POST /employees/:id/salaries` | Add a period | `{ salary_record: { salary, effective_on, currency? } }`. Returns 201 with the full history |
 | `PATCH /employees/:id/salaries/:sid` | Correct a period | `{ salary_record: { salary?, currency?, effective_on?, lock_version } }`. Returns the full history |
 | `DELETE /employees/:id/salaries/:sid` | Cancel a pending period | 204, or 422 if it has taken effect or is the only period |
+| `GET /exchange_rates/current` | Rate set to pin | `{ rate_set: { token, provider, base, rate_date, fetched_at, rates } \| null, status }` (`status` is `current`, `stale` or `unavailable`). May refresh the cached rates |
+| `GET /insights/summary` | Dashboard | Query: `currency`, `rates_token`. Returns `headcount`, `without_current_salary`, `monthly_cost`, `annual_cost`, `by_currency` (`currency`, `headcount`, `monthly_cost_original`, `annual_cost_original`, `rate`, `monthly_cost`), `conversion` |
+| `GET /insights/department_costs` | Report 1 | Query: `currency`, `rates_token`, `country_code`, `employment_type`. Returns `data` (`department`, `headcount`, `without_current_salary`, `monthly_cost`, `share_percent`) sorted by cost, `by_currency` (`department`, `currency`, `monthly_cost_original`), `conversion` |
+| `GET /insights/role_salary_ranges` | Report 2 | Query: `currency`, `rates_token`, `country_code`, `department`, `employment_type`. Returns `data` (`job_title`, `headcount`, `min`, `p25`, `median`, `p75`, `max`, `mean`, all annual) and `conversion` |
+| `GET /insights/country_salary_distribution` | Report 3 | Query: `currency`, `rates_token`, `department`, `job_title`, `employment_type`; no country filter. Returns the same fields per country for every country, and `conversion` |
+
+Insight requests reject an unsupported `currency` with 422. Without `rates_token` they use the latest cached rate set; `rates_token=none` pins "no rates", so a page that loaded without rates keeps every report consistent. A token the cache no longer holds (after a restart) gets **409 `unknown_rates_token`**; the page then fetches `/exchange_rates/current` again and reruns its reports. `conversion` is `{ display_currency, status, rates_token, provider, rate_date, fetched_at, rates }`, where `rates` maps each currency used to "1 unit = n display currency" (as a string).
 
 An employee (directory row or profile) has `id`, `first_name`, `last_name`, `email`, `job_title`, `department`, `country_code`, `country_name`, `employment_type`, `hire_date`, `lock_version`, and `current_salary` and `pending_salary`, each `{ id, salary, currency, effective_on }` or `null`.
 
@@ -279,7 +316,7 @@ A salary period in the history has `id`, `salary`, `currency`, `effective_on`, `
 
 - **Controllers** (`app/controllers/api/v1/`) stay thin: they permit parameters, call the model and render. `BaseController` maps exceptions to the error format above.
 - **Models** own validations, the salary-period rules and the locked write methods (`Employee.create_with_first_salary`, `Employee#update_with_lock`, `EmployeeSalary#save_with_lock`, `EmployeeSalary#destroy_with_lock`).
-- **Query objects** (`app/queries/`) build the larger reads in SQL. `EmployeeDirectoryQuery` filters, sorts and paginates the directory and joins each row's current and pending salary through two `LATERAL` subqueries, so a page is one query plus a count, with no N+1. Insight queries will live here too.
+- **Query objects** (`app/queries/`) build the larger reads in SQL. `EmployeeDirectoryQuery` filters, sorts and paginates the directory and joins each row's current and pending salary through two `LATERAL` subqueries, so a page is one query plus a count, with no N+1. The insight queries live in `app/queries/insights/`, and the exchange-rate code (`RateSet`, the cache `Store`, the Frankfurter client and refresh) in `app/services/exchange_rates/`.
 - **Serializers** (`app/serializers/`) are plain classes that list exactly which fields the API exposes.
 
 ## Frontend structure
@@ -292,6 +329,9 @@ src/
     employees/  directory page, filters, table, URL state, add/edit employee modal
     profile/    employee profile, salary summary, salary history table
     salaries/   add/correct salary modal, effective-date preview
+    dashboard/  dashboard: headcount and estimated cost tiles, original-currency breakdown
+    insights/   insights page, the three reports, display-currency picker, rates note,
+                per-report URL filters, and the bar and range charts (charts/)
   lib/          formatting, date parsing, mapping server errors onto form fields
   test/         Vitest setup and helpers (mocked fetch, providers)
 ```
@@ -300,6 +340,8 @@ src/
 - **Components:** Mantine 9 (tables, forms, selects, date inputs, modals, notifications) with Tabler icons.
 - **Directory table:** every column sorts on the server. The salary column shows the current salary, with a scheduled change as a second line only when there is one.
 - **Profile:** one salary card shows the current salary and its change from the previous one (or "Starting salary"). The scheduled change appears as a highlighted panel in that card only when it exists, so nothing renders as an empty slot.
+- **Dashboard and Insights:** both pages fetch the current rate set once (`staleTime: Infinity`) and send its token (or `none`) with every report request, so all reports on a page convert with the same rates. On a 409 `unknown_rates_token` the page re-pins once and reruns its reports. The display currency lives in the URL (`?currency=`) and is remembered per browser; each report's filters live in the URL under its own prefix (`dept.`, `role.`, `dist.`). Salary edits refresh the reports but not the pinned rates.
+- **Charts:** small HTML/CSS components rather than a chart library. Horizontal bars (at most 24px thick, 4px rounded end, hairline gridlines) and range rows (min–max whisker, 25th–75th percentile box, median tick). Each mark is keyboard-focusable with a tooltip and a full text label, and every report has a table view with the exact figures.
 - **Routing:** React Router. The directory's search, filters, sort and page live in the URL, so views can be bookmarked and the Back button restores them; the profile's breadcrumb returns to the same list view.
 - **Forms:** Mantine form with validation on blur and on submit. Server validation errors are shown under the matching field. A `409 stale_record` keeps the modal open and offers to load the latest values. The form sends the `lock_version` it was opened with, so a save can't overwrite someone else's edit.
 
@@ -330,6 +372,8 @@ A light, minimal "Swiss" style for a data-dense internal tool, chosen with the U
 | `APP_TIME_ZONE` | API | `Asia/Kolkata` | Business time zone that defines "today" |
 | `CORS_ORIGINS` | API | `http://localhost:5173` | Comma-separated origins allowed to call `/api/*` |
 | `RAILS_MAX_THREADS`, `PORT` | API | 5, 3000 | Puma |
+| `EXCHANGE_RATES_URL` | API | `https://api.frankfurter.dev/v2` | Frankfurter base URL (self-hosted instances work too) |
+| `EXCHANGE_RATES_REFRESH_HOURS` | API | 6 | How long the cached rates are used before checking for newer ones |
 | `VITE_API_BASE_URL` | UI | `http://localhost:3000` | API base URL, without `/api/v1` |
 | `VITE_APP_NAME` | UI | `ACME Salary` | Name in the header and browser tab |
 | `VITE_HR_USER_NAME`, `VITE_HR_USER_ROLE` | UI | `Jordan Rivera`, `HR Manager` | The demo HR profile in the header |

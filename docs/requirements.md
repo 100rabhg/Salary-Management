@@ -20,11 +20,15 @@ Replace the spreadsheets that ACME's HR team uses today with a web app. In the a
    - A salary change adds a new period. Increases and decreases are both allowed, and effective dates may be in the past, today, or the future, but not before the joining date. There is at most one period per employee per date.
    - Relative to today in the business time zone (Asia/Kolkata), a period is **current** (the latest one effective on or before today), **past** (any earlier one), or **pending** (effective after today). An employee has **at most one pending period**, and this holds even under concurrent requests.
    - Any period, including the initial, past, current, and pending ones, can be edited to correct a mistake. A pending period can also be cancelled until its effective date; periods that have taken effect cannot be cancelled, and an employee always keeps at least one period.
-4. **Salary insights.** These answer "how do we pay people":
-   - Per country: headcount, total payroll, and minimum, median, average, and maximum salary.
-   - Per job title within a country: the same statistics, so like-for-like roles can be compared.
-   - Per department within a country: headcount and salary distribution.
-   - All figures are calculated in the database from live data, never precomputed or hard-coded.
+4. **Dashboard and salary insights.** These answer "how do we pay people", in one **display currency** the user picks from the six supported currencies (default INR):
+   - **Dashboard** (the home page): headcount, estimated monthly cost and estimated annual cost, with an optional breakdown by original salary currency.
+   - **Insights**, three reports, each with its own filters. A report never filters on the dimension it groups by.
+     1. *Monthly cost by department* (filters: country, employment type).
+     2. *Annual salary range by role*: minimum, 25th percentile, median, 75th percentile, maximum and mean per job title (filters: country, department, employment type).
+     3. *Annual salary distribution by country*: the same statistics for every country side by side (filters: department, job title, employment type).
+   - **Definitions.** Each employee's *current salary* is their latest salary period effective on or before today. *Headcount* counts every matching employee; employees with no salary in effect yet are shown separately and left out of salary figures. *Monthly cost* is the sum of current annual base salaries divided by 12 (all employment types, no bonus or employer costs). Salary ranges are always annual; costs are always monthly.
+   - **Conversion.** Each salary is converted to the display currency *before* figures are combined, using dated ECB reference rates. Converted figures are labelled as estimates and show their rate date and source. Stored salaries are never converted or changed.
+   - All figures are calculated in the database from live data, never precomputed or hard-coded. Percentiles are calculated exactly.
 5. **Seed data.** A repeatable script creates 10,000 realistic employees across multiple countries, departments, and roles, with salaries in plausible local ranges.
 6. **Quality.** The core domain logic, the API, and key UI flows have fast, deterministic unit and request tests, and CI runs lint, type checks, security scans, and tests.
 7. **Deployed.** Frontend, API, and database are publicly reachable, and there is a short video demo.
@@ -32,10 +36,10 @@ Replace the spreadsheets that ACME's HR team uses today with a web app. In the a
 ## Key decisions
 
 - **Employee details and salary periods are separate records.** `employees` stores employee details; `employee_salaries` stores one row per salary period, including salary, currency, and `effective_on`.
-- **Salaries are stored in the currency HR records, and aggregates never mix currencies.** Each salary period carries its own currency, which usually but not always matches the employee's country. Mixing currencies in one average is meaningless, and converting them would require exchange rates and a policy for which rate and which date to use, which is a separate product decision. Insights will therefore group by currency as well as by country.
+- **Salaries are stored in their original currency and never converted.** Each salary period carries its own currency, which usually but not always matches the employee's country. Reports convert at read time into the chosen display currency using the latest ECB reference rates (fetched from Frankfurter and kept as one dated rate set in the API's in-memory cache), and label the results as estimates. Every salary is converted before figures are combined, so no statistic mixes currencies. All reports on one page use the same rate set.
 - **"Today" is a business date in one time zone, Asia/Kolkata** (configurable). It decides whether a period is past, current, or pending, so the API, the database queries, and the UI all use the same date.
 - **Each salary period stores one annual base salary.** This is how HR compares pay. Bonus, equity, and allowances are excluded (see below).
-- **Stack:** Rails API, PostgreSQL, React with TypeScript (Vite). PostgreSQL provides `percentile_cont` for medians and proper indexing for filtering at this scale.
+- **Stack:** Rails API, PostgreSQL, React with TypeScript (Vite). PostgreSQL provides exact `numeric` arithmetic for converted figures and percentiles, and proper indexing for filtering at this scale.
 
 ## Deliberately out of scope (and why)
 
@@ -43,7 +47,8 @@ Replace the spreadsheets that ACME's HR team uses today with a web app. In the a
 | --- | --- |
 | Authentication, roles, and permissions | There is a single persona and the data is synthetic. Adding auth properly (SSO, role-based access, audit) would take time away from the core workflows. It is the first item for a real rollout. The UI shows a fixed demo HR profile in the header instead. |
 | Audit log of salary corrections and cancellations | Corrections overwrite a period and a cancelled pending period is deleted, so the app keeps no record of who changed what. A real rollout needs this alongside authentication. |
-| Currency conversion and a global payroll total | Needs a source of exchange rates and a policy decision about which rate to use. Per-country reporting answers the questions honestly in the meantime. |
+| Converting stored salaries, rates as of each salary's date, and live or intraday rates | Reports only need today's estimate in one display currency. Stored salaries stay in their original currency; historical or live rates would need a rate policy and a paid data source. |
+| Salary movements over a date range, and the impact of upcoming salary changes | The reports describe current pay. Trends and scheduled-change forecasting are separate features. |
 | Bonus, equity, benefits, and allowances | Base salary covers the core "how do we pay people" questions. Total compensation multiplies the complexity. |
 | Payroll processing, tax, and payslips | This is a different product, payroll rather than salary management, with legal requirements that vary by country. |
 | Excel/CSV bulk import and export | Useful for migration, but the seed script covers the initial load. Import needs validation and error reporting to be done properly. |
@@ -56,5 +61,6 @@ Replace the spreadsheets that ACME's HR team uses today with a web app. In the a
 - Every employee has an initial salary period, effective on their joining date; salary changes add dated periods, and current salary reporting uses the latest period effective today.
 - No employee ever has more than one pending salary period, even when two HR users save at the same moment.
 - Every insight figure can be traced to a query over the current data and changes immediately after an edit.
+- Every converted figure shows its rate date and source, every report on a page uses the same rate set, and reports keep working from the last cached rates when the rate provider is unavailable.
 - The seed script produces 10,000 employees, and the list and insight endpoints stay responsive at that size.
 - The test suite runs green in CI on every push.
