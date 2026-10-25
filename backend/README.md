@@ -12,7 +12,7 @@ Rails 8 API (API-only) with PostgreSQL. It serves the employee directory, employ
 ```sh
 bundle install
 bin/rails db:prepare   # creates and migrates the development database
-bin/rails db:seed      # 10,000 synthetic employees; safe to re-run
+bin/rails db:seed      # 10,000 synthetic employees with salary history; safe to re-run
 bin/rails server       # http://localhost:3000
 ```
 

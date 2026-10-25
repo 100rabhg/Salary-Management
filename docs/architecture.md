@@ -174,7 +174,18 @@ Name search uses `ILIKE` on first name, last name, full name and email, with LIK
 
 ### How insights use the model
 
-Every report starts from the same set: each employee joined to their **current salary**, the latest period with `effective_on <= today` (a `DISTINCT ON (employee_id)` CTE in `Insights::Report`; on the 10,000-row seed it aggregates in about 10 ms, against 17 ms for a `LATERAL` lookup per employee). Pending and superseded periods never count.
+The Dashboard and the Insights page answer "how do we pay people" in one **display currency** the user picks from the six supported currencies (default INR). Each report has its own filters and never filters on the dimension it groups by.
+
+| Report | Groups by | Filters |
+| --- | --- | --- |
+| Dashboard summary | nothing (optional breakdown by original currency) | none |
+| Monthly cost by department | department | country, employment type |
+| Annual salary range by role | job title | country, department, employment type |
+| Annual salary distribution by country | country | department, job title, employment type |
+
+*Headcount* counts every matching employee; employees with no salary in effect yet are shown separately and left out of salary figures. *Monthly cost* is the sum of current annual base salaries divided by 12, for all employment types, with no bonus or employer costs. Ranges and distributions are annual; costs are monthly.
+
+Every report starts from the same set: each employee joined to their **current salary**, the latest period with `effective_on <= today` (a `DISTINCT ON (employee_id)` CTE in `Insights::Report`; on the 10,000-employee seed with 35,080 salary periods it aggregates in about 21 ms, against 28 ms for a `LATERAL` lookup per employee). Pending and superseded periods never count.
 
 Each salary is then **converted before anything is combined**. A `rates` CTE built from the pinned rate set (see [Exchange rates](#exchange-rates)) holds each currency's EUR-based rate, and the converted annual salary is `salary * eur_rate(display) / eur_rate(salary currency)`, computed in `numeric` (multiply first, then divide). Salaries already in the display currency are multiplied by exactly 1. Stored salaries are never written.
 
@@ -193,12 +204,14 @@ At 10,000 rows aggregating on request takes tens of milliseconds, so there are n
 
 ### Seed data
 
-`db/seeds.rb` calls `EmployeeSeed` (`lib/employee_seed.rb`) to create 10,000 synthetic employees and one initial salary period per employee.
+`db/seeds.rb` calls `EmployeeSeed` (`lib/employee_seed.rb`) to create 10,000 synthetic employees with salary history: 35,080 salary periods in total.
 
 - **Deterministic.** Headcount per country (US 3000, IN 2000, GB 1200, DE 1000, FR 800, JP 700, SG 700, NL 600) and per job title within each country is allocated from fixed weights. Every country therefore has all 8 departments and all 18 job titles, with at least 10 employees per country–job-title group and at least 30 per country–department group. Names, salary variation, employment type and hire date come from a fixed random seed, so every run produces identical data.
 - **Exact salaries.** Generated from a per-title base, a country pay factor, ±20% variation and a part-time reduction, using Integer and Rational arithmetic only. Rounded to whole units (nearest 100, or 1,000 for INR and JPY).
+- **Salary history.** Every employee's first period starts on their hire date. At each annual review (1 April), starting at least six months after hiring and up to today, an employee gets a raise of 3–12% with a 60% chance; the latest three raises are kept. About 5% (523) also have one pending raise 14–120 days ahead. The generated salary is the *current* one, and earlier periods are worked out backwards from it, so the insight figures don't depend on the history. History uses a second random stream, so the employees themselves are identical to the earlier seed. Review and pending dates depend on the day the seed runs.
+- **Planner statistics.** After the bulk insert the seed runs `ANALYZE employees, employee_salaries`. Without it, Postgres can keep planning for empty tables until autovacuum runs, and reports then take seconds instead of milliseconds.
 - **No real personal data.** Names are random combinations of common first and last names. Emails use the reserved `.example` domain (`first.last.00042@acme.example`).
-- **Safe to re-run.** Employee and initial salary rows are inserted in batches and in the same transaction. A second run skips existing employees and does not overwrite salary periods.
+- **Safe to re-run.** Employee and salary rows are inserted in batches and in the same transaction. A second run skips existing employees and does not add or overwrite their salary periods, so a database seeded before salary history existed needs a reset to get it.
 - **Limitation.** If HR changes a seeded employee's email, re-running the seed re-creates the original seeded record.
 
 ### Future evolution

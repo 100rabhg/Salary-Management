@@ -5,6 +5,12 @@
 # Randomness (from a fixed seed) is used only for names, salary variation,
 # employment type and hire date.
 #
+# Salary history comes from a second random stream, so adding it changed no
+# name, email or current salary. Each employee starts on their hire date, may
+# get raises at annual reviews (1 April) up to today, and some have one pending
+# raise. The generated salary is the current one; earlier periods are derived
+# backwards from it. Review and pending dates depend on `today`.
+#
 # #call inserts with ON CONFLICT DO NOTHING on lower(email): re-running never
 # duplicates or overwrites existing employees, including ones HR has edited.
 class EmployeeSeed
@@ -12,6 +18,12 @@ class EmployeeSeed
 
   DEFAULT_RANDOM_SEED = 20261023
   BATCH_SIZE = 1_000
+  REVIEW_MONTH = 4 # annual pay review on 1 April
+  RAISE_PERCENT = 60 # chance of a raise at each eligible review
+  RAISE_RANGE = 3..12 # percent
+  MAX_PAST_RAISES = 3
+  PENDING_PERCENT = 5 # employees with one scheduled raise
+  PENDING_DAYS = 14..120
   EMAIL_DOMAIN = "acme.example" # .example is reserved (RFC 2606); never a real address
   HIRE_DATES = Date.new(2012, 1, 1)..Date.new(2025, 12, 31)
   HIRE_DATE_SPAN_DAYS = (HIRE_DATES.end - HIRE_DATES.begin).to_i + 1
@@ -70,9 +82,10 @@ class EmployeeSeed
 
   attr_reader :count
 
-  def initialize(count:, random_seed: DEFAULT_RANDOM_SEED)
+  def initialize(count:, random_seed: DEFAULT_RANDOM_SEED, today: Date.current)
     @count = count
     @random_seed = random_seed
+    @today = today
   end
 
   def call
@@ -81,25 +94,25 @@ class EmployeeSeed
 
       Employee.transaction do
         inserted_employees = Employee.insert_all(
-          batch.map { |row| row.except(:salary, :currency) },
+          batch.map { |row| row.except(:salary_periods, :currency) },
           unique_by: :index_employees_on_lower_email,
           returning: [ :id, :email ]
         ).to_a
 
-        salary_rows = inserted_employees.map do |employee|
+        salary_rows = inserted_employees.flat_map do |employee|
           row = rows_by_email.fetch(employee.fetch("email"))
-          {
-            employee_id: employee.fetch("id"),
-            salary: row.fetch(:salary),
-            currency: row.fetch(:currency),
-            effective_on: row.fetch(:hire_date)
-          }
+          row.fetch(:salary_periods).map do |period|
+            period.merge(employee_id: employee.fetch("id"), currency: row.fetch(:currency))
+          end
         end
         EmployeeSalary.insert_all(salary_rows) if salary_rows.any?
 
         inserted_employees.length
       end
     end
+    # Bulk inserts leave the planner's row estimates stale (or at zero), and
+    # reports then pick plans meant for empty tables until autovacuum runs.
+    Employee.connection.execute("ANALYZE employees, employee_salaries")
     Result.new(inserted:, skipped: count - inserted)
   end
 
@@ -124,21 +137,24 @@ class EmployeeSeed
 
   def generate
     random = Random.new(@random_seed)
+    history_random = Random.new(@random_seed + 1)
     title_weights = JOB_TITLES.to_h { |job| [ job, job.weight ] }
     index = 0
 
     self.class.allocate(count, COUNTRY_WEIGHTS).flat_map do |country_code, country_count|
       self.class.allocate(country_count, title_weights).flat_map do |job, job_count|
-        Array.new(job_count) { build_row(random, country_code, job, index += 1) }
+        Array.new(job_count) { build_row(random, history_random, country_code, job, index += 1) }
       end
     end
   end
 
-  def build_row(random, country_code, job, index)
+  def build_row(random, history_random, country_code, job, index)
     first_name = FIRST_NAMES.sample(random:)
     last_name = LAST_NAMES.sample(random:)
     employment_type = pick_employment_type(random)
     currency = Country.currency_for(country_code)
+    salary = salary_for(random, job, country_code, currency, employment_type)
+    hire_date = HIRE_DATES.begin + random.rand(HIRE_DATE_SPAN_DAYS)
 
     {
       first_name:,
@@ -148,10 +164,36 @@ class EmployeeSeed
       department: job.department,
       country_code:,
       currency:,
-      salary: salary_for(random, job, country_code, currency, employment_type),
+      salary_periods: salary_periods(history_random, hire_date, salary, currency),
       employment_type:,
-      hire_date: HIRE_DATES.begin + random.rand(HIRE_DATE_SPAN_DAYS)
+      hire_date:
     }
+  end
+
+  # Oldest first; the last period effective on or before today is `current`.
+  def salary_periods(random, hire_date, current, currency)
+    dates = [ hire_date, *raise_dates(random, hire_date) ]
+    amounts = [ current ]
+    (dates.size - 1).times { amounts.unshift(round_salary(amounts.first / raise_factor(random), currency)) }
+    periods = dates.zip(amounts).map { |effective_on, salary| { effective_on:, salary: } }
+
+    if random.rand(100) < PENDING_PERCENT
+      periods << { effective_on: @today + random.rand(PENDING_DAYS), salary: round_salary(current * raise_factor(random), currency) }
+    end
+    periods
+  end
+
+  # Reviews at least six months after hiring, up to today; the latest raises win.
+  def raise_dates(random, hire_date)
+    eligible_from = hire_date >> 6
+    first_review = Date.new(eligible_from.year, REVIEW_MONTH, 1)
+    first_review = first_review.next_year if first_review < eligible_from
+    reviews = (first_review.year..@today.year).map { |year| Date.new(year, REVIEW_MONTH, 1) }.select { |date| date <= @today }
+    reviews.select { random.rand(100) < RAISE_PERCENT }.last(MAX_PAST_RAISES)
+  end
+
+  def raise_factor(random)
+    1 + Rational(random.rand(RAISE_RANGE), 100)
   end
 
   # 85% full time, 8% part time, 7% contract.
@@ -167,7 +209,11 @@ class EmployeeSeed
   def salary_for(random, job, country_code, currency, employment_type)
     amount = job.base_salary_usd * COUNTRY_PAY_FACTORS.fetch(country_code) * Rational(random.rand(80..120), 100)
     amount *= Rational(random.rand(50..60), 100) if employment_type == "part_time"
+    round_salary(amount, currency)
+  end
+
+  def round_salary(amount, currency)
     step = ROUNDING_STEP[currency]
-    BigDecimal((amount / step).round * step)
+    BigDecimal((amount.to_r / step).round * step)
   end
 end
