@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { request } from './client'
+import { insightKeys } from './insights'
 import type {
   DirectoryParams,
   Employee,
@@ -54,14 +55,16 @@ export function useSalaryHistory(employeeId: number) {
   })
 }
 
-// Every write can change the directory, the profile, the salary history and
-// the filter options, so it refreshes all of them.
+// Every write can change the directory, the profile, the salary history,
+// the filter options and the insight reports, so it refreshes all of them.
+// The pinned exchange-rate set is left alone.
 function useInvalidateAll() {
   const queryClient = useQueryClient()
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.employees }),
       queryClient.invalidateQueries({ queryKey: queryKeys.meta }),
+      queryClient.invalidateQueries({ queryKey: insightKeys.reports }),
     ])
 }
 
@@ -89,6 +92,7 @@ export function useDeleteEmployee() {
     mutationFn: (id: number) => request<void>(`/employees/${id}`, { method: 'DELETE' }),
     onSuccess: (_data, id) => {
       queryClient.removeQueries({ queryKey: queryKeys.employee(id) })
+      queryClient.invalidateQueries({ queryKey: insightKeys.reports })
       return queryClient.invalidateQueries({ queryKey: queryKeys.employees })
     },
   })

@@ -97,3 +97,89 @@ export interface SalaryRecordInput {
   effective_on: string
   lock_version?: number
 }
+
+// Exchange rates and insight reports (see docs/architecture.md, "Exchange rates").
+
+export interface RateSet {
+  /** Opaque version of this rate set; reports are pinned to it. */
+  token: string
+  provider: string
+  base: string
+  rate_date: string
+  fetched_at: string
+  /** Units of each currency per 1 EUR, as decimal strings. */
+  rates: Record<string, string>
+}
+
+export type RatesStatus = 'current' | 'stale' | 'unavailable'
+
+export interface CurrentRates {
+  rate_set: RateSet | null
+  status: RatesStatus
+}
+
+export type ConversionStatus = RatesStatus | 'not_needed'
+
+export interface Conversion {
+  display_currency: string
+  status: ConversionStatus
+  rates_token: string | null
+  provider: string | null
+  rate_date: string | null
+  fetched_at: string | null
+  /** Display-currency units per one unit of each currency in the report. */
+  rates: Record<string, string>
+}
+
+export interface InsightsSummary {
+  headcount: number
+  without_current_salary: number
+  annual_cost: string | null
+  monthly_cost: string | null
+  by_currency: {
+    currency: string
+    headcount: number
+    annual_cost_original: string
+    monthly_cost_original: string
+    rate: string | null
+    monthly_cost: string | null
+  }[]
+  conversion: Conversion
+}
+
+export interface DepartmentCosts {
+  data: {
+    department: string
+    headcount: number
+    without_current_salary: number
+    monthly_cost: string | null
+    share_percent: number | null
+  }[]
+  by_currency: { department: string; currency: string; monthly_cost_original: string }[]
+  conversion: Conversion
+}
+
+/** Annual salary statistics in the display currency; null without rates or employees. */
+export interface SalaryRange {
+  headcount: number
+  min: string | null
+  p25: string | null
+  median: string | null
+  p75: string | null
+  max: string | null
+  mean: string | null
+}
+
+export interface RoleSalaryRanges {
+  data: (SalaryRange & { job_title: string })[]
+  conversion: Conversion
+}
+
+export interface CountrySalaryDistribution {
+  data: (SalaryRange & { country_code: string; country_name: string })[]
+  conversion: Conversion
+}
+
+export type InsightFilterKey = 'country_code' | 'department' | 'job_title' | 'employment_type'
+
+export type ReportParams = { currency: string; rates_token?: string } & Partial<Record<InsightFilterKey, string>>

@@ -1,0 +1,186 @@
+/* Horizontal charts: a label column and a plot column per row. */
+.chart {
+  --label-width: 200px;
+  --gridline: var(--mantine-color-gray-2);
+}
+
+.row,
+.axis {
+  display: grid;
+  grid-template-columns: var(--label-width) minmax(0, 1fr);
+  column-gap: var(--mantine-spacing-md);
+  align-items: center;
+}
+
+.row {
+  min-height: 36px;
+}
+
+.label {
+  font-size: var(--mantine-font-size-sm);
+  color: var(--mantine-color-navy-9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plot {
+  position: relative;
+  height: 36px;
+  border-radius: var(--mantine-radius-sm);
+  outline: none;
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--mantine-color-brand-6);
+  }
+}
+
+.plot[data-interactive]:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+/* Hairline, solid, recessive gridlines. */
+.gridline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--gridline);
+}
+
+/* Bars: at most 24px thick, 4px rounded data end, square at the baseline. */
+.bar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 20px;
+  transform: translateY(-50%);
+  background: var(--mantine-color-brand-7);
+  border-radius: 0 4px 4px 0;
+  min-width: 2px;
+}
+
+/* Range: min-max whisker, P25-P75 box, median tick ringed in the surface colour. */
+.whisker {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--mantine-color-navy-3);
+}
+
+.whiskerEnd {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  background: var(--mantine-color-navy-3);
+}
+
+.box {
+  position: absolute;
+  top: 50%;
+  height: 16px;
+  transform: translateY(-50%);
+  background: var(--mantine-color-brand-6);
+  border-radius: 4px;
+  min-width: 4px;
+}
+
+.median {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  background: var(--mantine-color-navy-9);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--mantine-color-white);
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.axisPlot {
+  position: relative;
+  height: 20px;
+  margin-top: 4px;
+}
+
+.tick {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tick:first-child {
+  transform: none;
+}
+
+.tick:last-child {
+  transform: translateX(-100%);
+}
+
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-md);
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.keyItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.keyBox {
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--mantine-color-brand-6);
+}
+
+.keyMedian {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--mantine-color-navy-9);
+}
+
+.keyWhisker {
+  display: inline-block;
+  width: 18px;
+  height: 2px;
+  background: var(--mantine-color-navy-3);
+}
+
+/* On phones the label sits above its plot. */
+@media (max-width: 36em) {
+  .row,
+  .axis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row {
+    row-gap: 2px;
+    padding-top: 4px;
+  }
+
+  .axis > :first-child {
+    display: none;
+  }
+}

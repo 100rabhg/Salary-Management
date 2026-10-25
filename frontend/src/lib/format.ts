@@ -7,11 +7,41 @@ import type { EmploymentType } from '../api/types'
 export function formatMoney(amount: string | number, currency: string) {
   const value = Number(amount)
   const whole = Number.isInteger(value) ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}
-  return new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', {
+  return new Intl.NumberFormat(moneyLocale(currency), {
     style: 'currency',
     currency,
     ...whole,
   }).format(value)
+}
+
+function moneyLocale(currency: string) {
+  return currency === 'INR' ? 'en-IN' : 'en-US'
+}
+
+// Short form for headline figures and axis ticks: ₹536.3Cr, ₹12L, $22.2K, ¥34.1M.
+export function formatCompactMoney(amount: string | number, currency: string) {
+  const value = Number(amount)
+  // Intl compacts 6,435 crore as "₹6.4KCr"; HR reads large INR amounts in crores.
+  if (currency === 'INR' && Math.abs(value) >= 1e7) {
+    const crores = value / 1e7
+    const digits = Math.abs(crores) >= 1000 ? 0 : 1
+    return `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: digits }).format(crores)}Cr`
+  }
+  return new Intl.NumberFormat(moneyLocale(currency), {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+// An exchange rate for reading, e.g. "₹94.945" or "¥1.6515".
+export function formatRate(rate: number, currency: string) {
+  return new Intl.NumberFormat(moneyLocale(currency), {
+    style: 'currency',
+    currency,
+    maximumSignificantDigits: 5,
+  }).format(rate)
 }
 
 export function formatPercent(percent: number) {

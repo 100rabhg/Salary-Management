@@ -76,3 +76,15 @@
     top: 8px;
   }
 }
+
+/* Three nav items don't fit beside the logo on phones: icons only there. */
+@media (max-width: 30em) {
+  .navText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}

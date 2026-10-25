@@ -1,5 +1,12 @@
 import { Avatar, Box, Container, Group, Menu, Text, UnstyledButton } from '@mantine/core'
-import { IconChartLine, IconChevronDown, IconInfoCircle, IconUsers } from '@tabler/icons-react'
+import {
+  IconChartBar,
+  IconChartLine,
+  IconChevronDown,
+  IconInfoCircle,
+  IconLayoutDashboard,
+  IconUsers,
+} from '@tabler/icons-react'
 import { NavLink, Outlet } from 'react-router'
 import { config } from '../config'
 import { initials } from '../lib/format'
@@ -24,10 +31,20 @@ export function AppLayout() {
                 </Text>
               </Group>
               <nav aria-label="Main">
-                <NavLink to="/employees" className={classes.navLink}>
-                  <IconUsers size={18} aria-hidden />
-                  Employees
-                </NavLink>
+                <Group gap={4} wrap="nowrap">
+                  <NavLink to="/" end className={classes.navLink}>
+                    <IconLayoutDashboard size={18} aria-hidden />
+                    <span className={classes.navText}>Dashboard</span>
+                  </NavLink>
+                  <NavLink to="/employees" className={classes.navLink}>
+                    <IconUsers size={18} aria-hidden />
+                    <span className={classes.navText}>Employees</span>
+                  </NavLink>
+                  <NavLink to="/insights" className={classes.navLink}>
+                    <IconChartBar size={18} aria-hidden />
+                    <span className={classes.navText}>Insights</span>
+                  </NavLink>
+                </Group>
               </nav>
             </Group>
             <HrProfileMenu />

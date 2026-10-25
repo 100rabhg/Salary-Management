@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatMoney, formatPercent, initials } from './format'
+import { formatCompactMoney, formatDate, formatMoney, formatPercent, formatRate, initials } from './format'
 
 describe('formatMoney', () => {
   it('uses Indian digit grouping for INR and drops .00 on whole amounts', () => {
@@ -30,5 +30,20 @@ describe('formatDate and initials', () => {
 
   it('takes the first two initials', () => {
     expect(initials('Jordan  Rivera Lee')).toBe('JR')
+  })
+})
+
+describe('formatCompactMoney and formatRate', () => {
+  it('shortens headline figures in each currency\'s style', () => {
+    expect(formatCompactMoney('5362817187.87', 'INR')).toBe('₹536.3Cr')
+    expect(formatCompactMoney('64353806254.48', 'INR')).toBe('₹6,435Cr')
+    expect(formatCompactMoney('1200000.00', 'INR')).toBe('₹12L')
+    expect(formatCompactMoney('22187.50', 'USD')).toBe('$22.2K')
+    expect(formatCompactMoney('34080000.00', 'JPY')).toBe('¥34.1M')
+  })
+
+  it('shows exchange rates to five significant digits', () => {
+    expect(formatRate(94.94505, 'INR')).toBe('₹94.945')
+    expect(formatRate(0.625, 'INR')).toBe('₹0.625')
   })
 })

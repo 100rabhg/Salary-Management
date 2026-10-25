@@ -31,5 +31,6 @@ window.ResizeObserver = ResizeObserver
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
   vi.unstubAllGlobals()
 })
