@@ -15,7 +15,7 @@ Requirements come first, then one complete vertical slice at a time: backend, te
 | 3c | Employee API | Salary-period rules (editable periods, one pending period under a row lock, cancel pending, currency independent of country), CRUD and salary endpoints, transactional employee and first-salary creation, request specs, CI test job, API section in `architecture.md` | Done |
 | 4 | Frontend core workflows | App shell with demo HR profile, employee directory (search, filters, sorting, server-side pagination), profile with current, scheduled and past salaries, modals to add and edit employees and salary periods, loading, empty, error and help states, Vitest tests in CI | Done |
 | 5 | Dashboard and insights | Dashboard (headcount, estimated monthly and annual cost), Insights page with monthly cost by department, annual salary range by role and annual salary distribution by country, display currency with ECB rates from Frankfurter cached in memory, exact percentiles, figures checked against known data | Done |
-| 6 | Testing and quality | Gaps in test coverage closed, error handling reviewed, behaviour verified with 10k records | Not started |
+| 6 | Testing and quality | Gaps in test coverage closed, error handling reviewed, behaviour verified with 10k records | Done |
 
 ## Commit strategy
 
