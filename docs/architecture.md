@@ -393,6 +393,15 @@ A light, minimal "Swiss" style for a data-dense internal tool, chosen with the U
 
 `VITE_*` values are fixed when the frontend is built. Each app has a `.env.example`.
 
-## Deployment (to be finalised in milestone 7)
+## Deployment
 
-The plan is to deploy the API and PostgreSQL to a managed host and the static frontend to a CDN, configured through the variables above.
+| Part | Host | Details |
+| --- | --- | --- |
+| API | Heroku, `salary-management-api` (heroku-24 stack, one Basic dyno, US region) | https://salary-management-api-9c972f03ed70.herokuapp.com |
+| Database | Heroku Postgres essential-0 | Provides `DATABASE_URL`, which overrides `config/database.yml` |
+| UI | Vercel, `salary-management` (static Vite build) | https://salary-management-lime-rho.vercel.app |
+
+- **API releases.** Only `backend/` is pushed, with `git subtree push --prefix backend heroku main`. The Ruby buildpack reads `.ruby-version`. The `Procfile` runs Puma for `web` and `bin/rails db:migrate` as the `release` step, so a failed migration stops the release. The database was seeded once with `heroku run bin/rails db:seed`.
+- **UI releases.** `vercel deploy --prod` from `frontend/`. `VITE_API_BASE_URL` is a Vercel project variable, fixed at build time. `vercel.json` rewrites every path to `index.html`, so links such as `/employees/42` load directly.
+- **Production settings.** On Heroku: `RAILS_MASTER_KEY`, `APP_TIME_ZONE=Asia/Kolkata`, `EXCHANGE_RATES_URL`, and `CORS_ORIGINS` set to the Vercel URL only.
+- **Latency.** Heroku's router logs show the API answering in 44–95 ms, the same as locally. From India most of the roughly 0.9 s a browser sees is the network round trip to the US region; a region nearer the users would remove it.

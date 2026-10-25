@@ -9,7 +9,7 @@ Requirements come first, then one complete vertical slice at a time: backend, te
 | # | Milestone | Key outputs | Status |
 | --- | --- | --- | --- |
 | 1 | Requirements and planning | `requirements.md`, `architecture.md`, this plan, Git repo | Done |
-| 2 | Application setup | Rails API and React app scaffolded, CI (lint, type check, security scans), both run locally | Done locally (needs a CI run on GitHub) |
+| 2 | Application setup | Rails API and React app scaffolded, CI (lint, type check, security scans), both run locally | Done |
 | 3a | Employee and salary data model | `Employee` and `EmployeeSalary` models, two-table schema, `Country` list, deterministic seed script with one starting salary period per employee, model specs | Done |
 | 3b | Salary history | Salary periods for later changes, current-effective-salary lookup, effective-date handling, and model specs | Done |
 | 3c | Employee API | Salary-period rules (editable periods, one pending period under a row lock, cancel pending, currency independent of country), CRUD and salary endpoints, transactional employee and first-salary creation, request specs, CI test job, API section in `architecture.md` | Done |
